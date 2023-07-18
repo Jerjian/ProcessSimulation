@@ -4,7 +4,6 @@ import java.util.Queue;
 
 class ProcessSimulation {
     public static void main(String[] args) {
-
     }
 }
 
@@ -31,7 +30,6 @@ class PCB{
     int programCounter;
     int[] registers = new int[2]; //each instructions can use 2 registers to execute
     int clockTimeSinceStart;
-//    String[] listOfOpenFiles; //MAYBE REMOVE????!!!?!??!?!?!??!?!?!
 
     public PCB() {
         this.processState = ProcessState.NEW;
@@ -45,50 +43,86 @@ class PCB{
 
 class ProcessScheduler {
     Queue<Process> readyQueue = new LinkedList<>();
-    Queue<Process> waitQueue = new LinkedList<>();
+    //TODO: Wait queue for each OI device
+    Queue<Process> waitQueue1 = new LinkedList<>();
+    Queue<Process> waitQueue2 = new LinkedList<>();
 
-
+    //start by adding a process to the ready queue.
     public ProcessScheduler(Process process) {
-        this.addProcessToReadyQueue(process); //start by adding a process to the ready queue.
+        this.addProcessToReadyQueue(process);
     }
 
     public void addProcessToReadyQueue(Process process){
         process.pcb.processState = ProcessState.READY;
         readyQueue.add(process);
     }
-    public void addProcessToWaitQueue(Process process){
-        process.pcb.processState = ProcessState.WAITING;
-        waitQueue.add(process);
+
+    public void addProcessToWaitQueue(Process process, int IOdeviceRequested){
+        if (IOdeviceRequested == 1){
+            process.pcb.processState = ProcessState.WAITING;
+            waitQueue1.add(process);
+        }
+        else if (IOdeviceRequested == 2) {
+            process.pcb.processState = ProcessState.WAITING;
+            waitQueue2.add(process);
+        }
+        else{
+            System.out.println("Not valid IO device");
+        }
     }
 
     //TODO: add context switch , each process can only use 2 instructions at a time.
+    //TODO: Add timer of 2 per process
     public void execute() {
         while (!readyQueue.isEmpty()) {
             Process currentProcess = readyQueue.poll();
             currentProcess.pcb.processState = ProcessState.RUNNING;
 
+//            if(currentProcess.pcb.clockTimeSinceStart % 2 != 0){
+//
+//            }
+            //execute current process
             for (int i = 0; i < currentProcess.nbrOfInstructions; i++) {
                 currentProcess.pcb.programCounter++;
                 currentProcess.pcb.clockTimeSinceStart++;
 
+                //if ioRequest, add it to the correct waitqueue
                 if (currentProcess.ioRequests.contains(i)) {
                     int device = currentProcess.ioDevices.remove(0);
-                    waitQueue.get(device).add(currentProcess);
                     currentProcess.pcb.processState = ProcessState.WAITING;
+                    addProcessToWaitQueue(currentProcess,device); //adding process to wait queue
                     break;
                 }
 
+                //Last instruction, so set it as terminated.
                 if (i == currentProcess.nbrOfInstructions - 1) {
                     currentProcess.pcb.processState = ProcessState.TERMINATED;
                 }
             }
 
-            for (Queue<Process> queue : waitQueue.values()) {
-                Process waitingProcess = queue.peek();
+            //Check in the waitqueue, and add to ready queue.
+            for (int i = 0; i < waitQueue1.size(); i++) {
+                Process waitingProcess = waitQueue1.peek();
 
                 if (waitingProcess != null && waitingProcess.pcb.processState.equals(ProcessState.WAITING)) {
+                    //TODO: Take 5 time units to run. So take 5 instructions. Is this the right way of doing it, just increase clocktime by 5?
+                    waitingProcess.pcb.clockTimeSinceStart = waitingProcess.pcb.clockTimeSinceStart + 5;
                     waitingProcess.pcb.processState = ProcessState.READY;
-                    readyQueue.add(queue.poll());
+                    readyQueue.add(waitQueue1.poll());
+                    //TODO: I can add only 1 to the ready queue at a time from the waitqueue right?
+                    break;
+                }
+            }
+            for (int i = 0; i < waitQueue2.size(); i++) {
+                Process waitingProcess = waitQueue2.peek();
+
+                if (waitingProcess != null && waitingProcess.pcb.processState.equals(ProcessState.WAITING)) {
+                    //TODO: Take 5 time units to run. So take 5 instructions. Is this the right way of doing it, just increase clocktime by 5?
+                    waitingProcess.pcb.clockTimeSinceStart = waitingProcess.pcb.clockTimeSinceStart + 5;
+                    waitingProcess.pcb.processState = ProcessState.READY;
+                    readyQueue.add(waitQueue2.poll());
+                    //TODO: I can add only 1 to the ready queue at a time from the waitqueue right?
+                    break;
                 }
             }
         }
