@@ -1,9 +1,36 @@
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Queue;
+import java.io.File;  // Import the File class
+import java.io.FileNotFoundException;  // Import this class to handle errors
+import java.util.Scanner; // Import the Scanner class to read text files
+
 
 class ProcessSimulation {
     public static void main(String[] args) {
+        ArrayList<String> processes = new ArrayList<>();
+
+        try {
+            File myObj = new File("./src/text.txt");
+            Scanner myReader = new Scanner(myObj);
+            myReader.nextLine(); //skip first line
+            while (myReader.hasNextLine()) {
+                String data = myReader.nextLine();
+                processes.add(data);
+            }
+            myReader.close();
+        } catch (FileNotFoundException e) {
+            System.out.println("An error occurred.");
+            e.printStackTrace();
+        }
+
+        for (int i = 0; i < processes.size(); i++) {
+            System.out.println(processes.get(i));
+        }
+
+
+
     }
 }
 
@@ -11,8 +38,11 @@ class Process{
     int PID;
     int nbrOfInstructions;
     PCB pcb;
+
     ArrayList<Integer> ioRequests = new ArrayList<>();
     ArrayList<Integer> ioDevices = new ArrayList<>();
+
+
 
 
     public Process(int PID, int nbrOfInstructions, ArrayList<Integer> ioRequests, ArrayList<Integer> ioDevices) {
@@ -25,11 +55,12 @@ class Process{
 }
 
 class PCB{
+
+    //PID
     ProcessState processState;
     int programCounter;
     int[] registers = new int[2]; //each instructions can use 2 registers to execute
     int clockTimeSinceStart;
-
     int ioDeviceAllocatedTo;
 
     public PCB() {
@@ -142,3 +173,15 @@ enum ProcessState {
     READY,
     TERMINATED
 }
+
+/*additional notes
+
+While one process is waiting, the 2nd process can execute.
+
+PCB -> class, print the object, every variable gets printed
+which process do we proritize to go back to ready queue
+
+non-preemtive scheduling.
+
+is clock x the IO request.
+ */
