@@ -22,7 +22,6 @@ class Process{
         this.ioRequests = ioRequests;
         this.ioDevices = ioDevices;
     }
-
 }
 
 class PCB{
@@ -31,19 +30,23 @@ class PCB{
     int[] registers = new int[2]; //each instructions can use 2 registers to execute
     int clockTimeSinceStart;
 
+    int ioDeviceAllocatedTo;
+
     public PCB() {
         this.processState = ProcessState.NEW;
         this.programCounter = 0; //PC starts at 0 when PCB is created
         this.registers[0] = (int)(Math.random() * 10); //Random registers up to 10
         this.registers[1] = (int)(Math.random() * 10); //Random registers up to 10
         this.clockTimeSinceStart = 0; //clock time starts start at 0
+        //todo: keep track of which IOdevice it is allocated to while waiting?
+        this.ioDeviceAllocatedTo = 0;
     }
 }
 
 
 class ProcessScheduler {
     Queue<Process> readyQueue = new LinkedList<>();
-    //TODO: Wait queue for each OI device
+    //TODO: Wait queue for each OI device?
     Queue<Process> waitQueue1 = new LinkedList<>();
     Queue<Process> waitQueue2 = new LinkedList<>();
 
@@ -60,10 +63,12 @@ class ProcessScheduler {
     public void addProcessToWaitQueue(Process process, int IOdeviceRequested){
         if (IOdeviceRequested == 1){
             process.pcb.processState = ProcessState.WAITING;
+            process.pcb.ioDeviceAllocatedTo = 1;
             waitQueue1.add(process);
         }
         else if (IOdeviceRequested == 2) {
             process.pcb.processState = ProcessState.WAITING;
+            process.pcb.ioDeviceAllocatedTo = 2;
             waitQueue2.add(process);
         }
         else{
@@ -78,8 +83,9 @@ class ProcessScheduler {
             Process currentProcess = readyQueue.poll();
             currentProcess.pcb.processState = ProcessState.RUNNING;
 
+            //TODO: Add context switching during the execution of the current process
+
 //            if(currentProcess.pcb.clockTimeSinceStart % 2 != 0){
-//
 //            }
             //execute current process
             for (int i = 0; i < currentProcess.nbrOfInstructions; i++) {
@@ -103,11 +109,11 @@ class ProcessScheduler {
             //Check in the waitqueue, and add to ready queue.
             for (int i = 0; i < waitQueue1.size(); i++) {
                 Process waitingProcess = waitQueue1.peek();
-
                 if (waitingProcess != null && waitingProcess.pcb.processState.equals(ProcessState.WAITING)) {
                     //TODO: Take 5 time units to run. So take 5 instructions. Is this the right way of doing it, just increase clocktime by 5?
                     waitingProcess.pcb.clockTimeSinceStart = waitingProcess.pcb.clockTimeSinceStart + 5;
                     waitingProcess.pcb.processState = ProcessState.READY;
+                    waitingProcess.pcb.ioDeviceAllocatedTo = 0;
                     readyQueue.add(waitQueue1.poll());
                     //TODO: I can add only 1 to the ready queue at a time from the waitqueue right?
                     break;
@@ -120,6 +126,7 @@ class ProcessScheduler {
                     //TODO: Take 5 time units to run. So take 5 instructions. Is this the right way of doing it, just increase clocktime by 5?
                     waitingProcess.pcb.clockTimeSinceStart = waitingProcess.pcb.clockTimeSinceStart + 5;
                     waitingProcess.pcb.processState = ProcessState.READY;
+                    waitingProcess.pcb.ioDeviceAllocatedTo = 0;
                     readyQueue.add(waitQueue2.poll());
                     //TODO: I can add only 1 to the ready queue at a time from the waitqueue right?
                     break;
