@@ -1,15 +1,13 @@
 import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.*;
 import java.io.File;  // Import the File class
 import java.io.FileNotFoundException;  // Import this class to handle errors
-import java.util.Scanner; // Import the Scanner class to read text files
 
 
 class ProcessSimulation {
     public static void main(String[] args) {
-        ArrayList<String> processes = new ArrayList<>();
+        ArrayList<String> processesDataString = new ArrayList<>();
+        ArrayList<Process> processes = new ArrayList<>();
 
         try {
             File myObj = new File("./src/text.txt");
@@ -17,7 +15,7 @@ class ProcessSimulation {
             myReader.nextLine(); //skip first line
             while (myReader.hasNextLine()) {
                 String data = myReader.nextLine();
-                processes.add(data);
+                processesDataString.add(data);
             }
             myReader.close();
         } catch (FileNotFoundException e) {
@@ -25,10 +23,45 @@ class ProcessSimulation {
             e.printStackTrace();
         }
 
-        for (int i = 0; i < processes.size(); i++) {
-            System.out.println(processes.get(i));
+        for (int i = 0; i < processesDataString.size(); i++) {
+            processes.add(parseProcessDataString(processesDataString.get(i)));
         }
+//        for (int i = 0; i < processes.size(); i++) {
+//            System.out.println(processes.get(i));
+//        }
 
+        ProcessScheduler ps = new ProcessScheduler(processes);
+        ps.execute();
+
+
+    }
+
+    public static Process parseProcessDataString(String s){
+
+        String[] parts = s.split(", ");
+        int PID = Integer.parseInt(parts[0]); //good
+        int nbrOfInstructions = Integer.parseInt(parts[1]); //good
+
+        ArrayList<Integer> ioRequests = new ArrayList<>();
+        ArrayList<Integer> ioDevices = new ArrayList<>();
+
+        String part2 = parts[2].replace("[", "").replace("]", ",");
+        String[] part2Strings = part2.split(", ");
+
+        for (int i = 0; i < part2Strings.length; i++) {
+            String[] numbersString = part2Strings[i].split(",");
+            for (int j = 0; j < numbersString.length; j++) {
+                if(numbersString[j] == "") continue;
+                int currentNum = Integer.parseInt(numbersString[j]);
+                if (i==0){
+                    ioRequests.add(currentNum);
+                }else{
+                    ioDevices.add(currentNum);
+                }
+            }
+        }
+        Process process = new Process(PID, nbrOfInstructions,  ioRequests,  ioDevices);
+        return  process;
     }
 }
 
@@ -45,6 +78,17 @@ class Process{
         this.pcb = new PCB();
         this.ioRequests = ioRequests;
         this.ioDevices = ioDevices;
+    }
+
+    @Override
+    public String toString() {
+        return "Process{" +
+                "PID=" + PID +
+                ", nbrOfInstructions=" + nbrOfInstructions +
+                ", pcb=" + pcb +
+                ", ioRequests=" + ioRequests +
+                ", ioDevices=" + ioDevices +
+                '}';
     }
 }
 
@@ -65,6 +109,17 @@ class PCB{
         this.ioDeviceAllocatedTo = 0; //tracks while io devicde it is allocated to
         this.clockTimeSinceIORequest = 0; //when process gets an IOrequest, we need to track clock time up to 5
     }
+
+    @Override
+    public String toString() {
+        return "PCB{" +
+                "processState=" + processState +
+                ", programCounter=" + programCounter +
+                ", registers=" + Arrays.toString(registers) +
+                ", ioDeviceAllocatedTo=" + ioDeviceAllocatedTo +
+                ", clockTimeSinceIORequest=" + clockTimeSinceIORequest +
+                '}';
+    }
 }
 
 
@@ -74,8 +129,12 @@ class ProcessScheduler {
     Queue<Process> waitQueue2 = new LinkedList<>();
 
     //start by adding a process to the ready queue.
-    public ProcessScheduler(Process process) {
-        this.addProcessToReadyQueue(process);
+    public ProcessScheduler(ArrayList<Process> processes) {
+        for (Process process : processes) {
+            this.addProcessToReadyQueue(process);
+        }
+
+
     }
 
     public void addProcessToReadyQueue(Process process){
@@ -125,7 +184,7 @@ class ProcessScheduler {
     //TODO: add context switch , each process can only use 2 instructions at a time.
     //TODO: Add timer of 2 per process
     public void execute() {
-        while (!readyQueue.isEmpty()) {
+        while (!readyQueue.isEmpty() || !waitQueue1.isEmpty() || !waitQueue2.isEmpty()) {
             Process currentProcess = readyQueue.poll();
             currentProcess.pcb.processState = ProcessState.RUNNING;
 
@@ -139,25 +198,63 @@ class ProcessScheduler {
 
                 //if ioRequest, add it to the correct waitqueue
                 if (currentProcess.ioRequests.contains(currentProcess.pcb.programCounter)) {
-                    int device = currentProcess.ioDevices.remove(0);
-                    currentProcess.pcb.processState = ProcessState.WAITING;
+                    printInfo(currentProcess);
+                    int device = currentProcess.ioDevices.get(currentProcess.ioRequests.indexOf(currentProcess.pcb.programCounter));
+                    //int device = currentProcess.ioDevices.remove(0);
                     addProcessToWaitQueue(currentProcess, device); //adding process to wait queue
                     break;
                 }
 
                 //Last instruction, so set it as terminated.
                 if (currentProcess.pcb.programCounter == currentProcess.nbrOfInstructions) {
+                    printInfo(currentProcess);
                     currentProcess.pcb.processState = ProcessState.TERMINATED;
                     break;
                 }
+                printInfo(currentProcess);
             }
+
+
+
 
             //Check in the waitQueue if there's process ready to be added to ready queue.
             addWaitingProcessToReadyQueue(waitQueue1, readyQueue);
             addWaitingProcessToReadyQueue(waitQueue2, readyQueue);
+
+            if (currentProcess.pcb.processState.equals(ProcessState.RUNNING)){
+                currentProcess.pcb.processState = ProcessState.READY;
+                readyQueue.add(currentProcess);
+            }
+
+        }
+    }
+
+
+    //Print all info
+    public void printInfo(Process currentProcess){
+        System.out.println("--------------------------------------------------------");
+        System.out.println("Running");
+        System.out.println("\t"+currentProcess);
+        System.out.println("Ready Queue");
+
+        for (Process process : readyQueue) {
+            System.out.println("\t"+process);
+        }
+        System.out.println("Wait Queue 1");
+        for (int i = 0; i < waitQueue1.size(); i++) {
+            for (Process process : waitQueue1) {
+                System.out.println("\t"+process);
+            }
+        }
+        System.out.println("Wait Queue 2");
+        for (int i = 0; i < waitQueue2.size(); i++) {
+            for (Process process : waitQueue2) {
+                System.out.println("\t"+process);
+            }
         }
     }
 }
+
 
 
 enum ProcessState {
