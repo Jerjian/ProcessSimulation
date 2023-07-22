@@ -1,4 +1,3 @@
-import java.lang.reflect.Array;
 import java.util.*;
 import java.io.File;  // Import the File class
 import java.io.FileNotFoundException;  // Import this class to handle errors
@@ -26,9 +25,7 @@ class ProcessSimulation {
         for (int i = 0; i < processesDataString.size(); i++) {
             processes.add(parseProcessDataString(processesDataString.get(i)));
         }
-//        for (int i = 0; i < processes.size(); i++) {
-//            System.out.println(processes.get(i));
-//        }
+
 
         ProcessScheduler ps = new ProcessScheduler(processes);
         ps.execute();
@@ -127,9 +124,11 @@ class ProcessScheduler {
     Queue<Process> readyQueue = new LinkedList<>();
     Queue<Process> waitQueue1 = new LinkedList<>();
     Queue<Process> waitQueue2 = new LinkedList<>();
+    ArrayList<Process> processes = new ArrayList<>();
 
     //start by adding a process to the ready queue.
     public ProcessScheduler(ArrayList<Process> processes) {
+        this.processes = processes;
         for (Process process : processes) {
             this.addProcessToReadyQueue(process);
         }
@@ -169,64 +168,85 @@ class ProcessScheduler {
          }
      }
 
-     public static void addWaitingProcessToReadyQueue(Queue<Process> waitingQueue, Queue<Process> readyQueue){
+     public static void addWaitingProcessToReadyQueueOrTerminated(Queue<Process> waitingQueue, Queue<Process> readyQueue){
         Process waitingProcess = waitingQueue.peek();
          if (waitingProcess != null
                  && waitingProcess.pcb.processState.equals(ProcessState.WAITING)
                  && waitingProcess.pcb.clockTimeSinceIORequest == 5) {
 
-             waitingProcess.pcb.processState = ProcessState.READY;
-             waitingProcess.pcb.ioDeviceAllocatedTo = 0;
-             waitingQueue.poll(); //todo: find a more elegant way to do this
-             readyQueue.add(waitingProcess);
+             if (waitingProcess.nbrOfInstructions == waitingProcess.pcb.programCounter){
+                 waitingProcess.pcb.processState = ProcessState.TERMINATED;
+                 waitingProcess.pcb.ioDeviceAllocatedTo = 0;
+                 waitingProcess.pcb.clockTimeSinceIORequest = 0;
+                 waitingQueue.poll();
+
+             }else{
+                 waitingProcess.pcb.processState = ProcessState.READY;
+                 waitingProcess.pcb.ioDeviceAllocatedTo = 0;
+                 waitingProcess.pcb.clockTimeSinceIORequest = 0;
+                 waitingQueue.poll(); //todo: find a more elegant way to do this
+                 readyQueue.add(waitingProcess);
+             }
+
          }
      }
+
+
     //TODO: add context switch , each process can only use 2 instructions at a time.
     //TODO: Add timer of 2 per process
     public void execute() {
         while (!readyQueue.isEmpty() || !waitQueue1.isEmpty() || !waitQueue2.isEmpty()) {
+
             Process currentProcess = readyQueue.poll();
-            currentProcess.pcb.processState = ProcessState.RUNNING;
-
-            //TODO: Add context switching during the execution of the current process
-
-            //each loop is one instruction
-            for (int i = 0; i < 2; i++) {
-                currentProcess.pcb.programCounter++;
+            if (currentProcess == null){
+                //todo: waitqueu1 or waitqueue2 are NOT empty, run them until readyqueue
                 updateWaitQueueTime(waitQueue1);
                 updateWaitQueueTime(waitQueue2);
+                printInfo();
+                addWaitingProcessToReadyQueueOrTerminated(waitQueue1, readyQueue);
+                addWaitingProcessToReadyQueueOrTerminated(waitQueue2, readyQueue);
+            }else{
+                currentProcess.pcb.processState = ProcessState.RUNNING;
 
-                //if ioRequest, add it to the correct waitqueue
-                if (currentProcess.ioRequests.contains(currentProcess.pcb.programCounter)) {
+                //TODO: Add context switching during the execution of the current process
+
+                //each loop is one instruction
+                for (int i = 0; i < 2; i++) {
+                    currentProcess.pcb.programCounter++;
+                    updateWaitQueueTime(waitQueue1);
+                    updateWaitQueueTime(waitQueue2);
+
+                    //if ioRequest, add it to the correct waitqueue
+                    if (currentProcess.ioRequests.contains(currentProcess.pcb.programCounter)) {
+                        printInfo(currentProcess);
+                        int device = currentProcess.ioDevices.get(currentProcess.ioRequests.indexOf(currentProcess.pcb.programCounter));
+                        addProcessToWaitQueue(currentProcess, device); //adding process to wait queue
+                        break;
+                    }
+
+                    //Last instruction, so set it as terminated.
+                    if (currentProcess.pcb.programCounter == currentProcess.nbrOfInstructions) {
+                        printInfo(currentProcess);
+                        currentProcess.pcb.processState = ProcessState.TERMINATED;
+                        break;
+                    }
+
                     printInfo(currentProcess);
-                    int device = currentProcess.ioDevices.get(currentProcess.ioRequests.indexOf(currentProcess.pcb.programCounter));
-                    //int device = currentProcess.ioDevices.remove(0);
-                    addProcessToWaitQueue(currentProcess, device); //adding process to wait queue
-                    break;
+                    //Check in the waitQueue if there's process ready to be added to ready queue.
+                    addWaitingProcessToReadyQueueOrTerminated(waitQueue1, readyQueue);
+                    addWaitingProcessToReadyQueueOrTerminated(waitQueue2, readyQueue);
                 }
 
-                //Last instruction, so set it as terminated.
-                if (currentProcess.pcb.programCounter == currentProcess.nbrOfInstructions) {
-                    printInfo(currentProcess);
-                    currentProcess.pcb.processState = ProcessState.TERMINATED;
-                    break;
+
+                if (currentProcess.pcb.processState.equals(ProcessState.RUNNING)){
+                    currentProcess.pcb.processState = ProcessState.READY;
+                    readyQueue.add(currentProcess);
                 }
-                printInfo(currentProcess);
             }
-
-
-
-
-            //Check in the waitQueue if there's process ready to be added to ready queue.
-            addWaitingProcessToReadyQueue(waitQueue1, readyQueue);
-            addWaitingProcessToReadyQueue(waitQueue2, readyQueue);
-
-            if (currentProcess.pcb.processState.equals(ProcessState.RUNNING)){
-                currentProcess.pcb.processState = ProcessState.READY;
-                readyQueue.add(currentProcess);
-            }
-
         }
+        //print all terminated stuff
+        printInfo();
+
     }
 
 
@@ -250,6 +270,40 @@ class ProcessScheduler {
         for (int i = 0; i < waitQueue2.size(); i++) {
             for (Process process : waitQueue2) {
                 System.out.println("\t"+process);
+            }
+        }
+        System.out.println("Terminated");
+        for (Process process : processes) {
+            if (process.pcb.processState.equals(ProcessState.TERMINATED)){
+                System.out.println("\t" + process);
+            }
+        }
+
+    }
+    public void printInfo(){
+        System.out.println("--------------------------------------------------------");
+        System.out.println("Running");
+        System.out.println("Ready Queue");
+
+        for (Process process : readyQueue) {
+            System.out.println("\t"+process);
+        }
+        System.out.println("Wait Queue 1");
+        for (int i = 0; i < waitQueue1.size(); i++) {
+            for (Process process : waitQueue1) {
+                System.out.println("\t"+process);
+            }
+        }
+        System.out.println("Wait Queue 2");
+        for (int i = 0; i < waitQueue2.size(); i++) {
+            for (Process process : waitQueue2) {
+                System.out.println("\t"+process);
+            }
+        }
+        System.out.println("Terminated");
+        for (Process process : processes) {
+            if (process.pcb.processState.equals(ProcessState.TERMINATED)){
+                System.out.println("\t" + process);
             }
         }
     }
