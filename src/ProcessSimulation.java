@@ -1,14 +1,23 @@
+import java.io.*;
 import java.util.*;
-import java.io.File;  // Import the File class
-import java.io.FileNotFoundException;  // Import this class to handle errors
 
 
 class ProcessSimulation {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws FileNotFoundException {
         ArrayList<String> processesDataString = new ArrayList<>();
         ArrayList<Process> processes = new ArrayList<>();
 
+        //Read file
+        File file;
+        FileOutputStream fos = null;
+        PrintStream fileOut = null;
         try {
+            file = new File("output.txt");
+            fos = new FileOutputStream(file);
+            fileOut = new PrintStream(fos);
+            System.setOut(fileOut);
+
+
             File myObj = new File("./src/text.txt");
             Scanner myReader = new Scanner(myObj);
             myReader.nextLine(); //skip first line
@@ -29,8 +38,12 @@ class ProcessSimulation {
 
         ProcessScheduler ps = new ProcessScheduler(processes);
         ps.execute();
-
-
+        try{
+            fileOut.close();
+            fos.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public static Process parseProcessDataString(String s){
@@ -252,7 +265,7 @@ class ProcessScheduler {
 
     //Print all info
     public void printInfo(Process currentProcess){
-        System.out.println("--------------------------------------------------------");
+        System.out.println("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Running");
         System.out.println("\t"+currentProcess);
         System.out.println("Ready Queue");
@@ -281,7 +294,7 @@ class ProcessScheduler {
 
     }
     public void printInfo(){
-        System.out.println("--------------------------------------------------------");
+        System.out.println("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Running");
         System.out.println("Ready Queue");
 
