@@ -114,8 +114,8 @@ class PCB{
     public PCB() {
         this.processState = ProcessState.NEW;
         this.programCounter = 0; //PC starts at 0 when PCB is created
-        this.registers[0] = (int)(Math.random() * 100); //Random registers up to 10
-        this.registers[1] = (int)(Math.random() * 100); //Random registers up to 10
+        this.registers[0] = (int)(Math.random() * 100); //Random registers up to 100
+        this.registers[1] = (int)(Math.random() * 100); //Random registers up to 100
         this.ioDeviceAllocatedTo = 0; //tracks while io devicde it is allocated to
         this.clockTimeSinceIORequest = 0; //when process gets an IOrequest, we need to track clock time up to 5
     }
@@ -197,7 +197,7 @@ class ProcessScheduler {
                  waitingProcess.pcb.processState = ProcessState.READY;
                  waitingProcess.pcb.ioDeviceAllocatedTo = 0;
                  waitingProcess.pcb.clockTimeSinceIORequest = 0;
-                 waitingQueue.poll(); //todo: find a more elegant way to do this
+                 waitingQueue.poll();
                  readyQueue.add(waitingProcess);
              }
 
@@ -205,14 +205,11 @@ class ProcessScheduler {
      }
 
 
-    //TODO: add context switch , each process can only use 2 instructions at a time.
-    //TODO: Add timer of 2 per process
     public void execute() {
         while (!readyQueue.isEmpty() || !waitQueue1.isEmpty() || !waitQueue2.isEmpty()) {
 
             Process currentProcess = readyQueue.poll();
             if (currentProcess == null){
-                //todo: waitqueu1 or waitqueue2 are NOT empty, run them until readyqueue
                 updateWaitQueueTime(waitQueue1);
                 updateWaitQueueTime(waitQueue2);
                 printInfo();
@@ -221,7 +218,6 @@ class ProcessScheduler {
             }else{
                 currentProcess.pcb.processState = ProcessState.RUNNING;
 
-                //TODO: Add context switching during the execution of the current process
 
                 //each loop is one instruction
                 for (int i = 0; i < 2; i++) {
@@ -230,6 +226,7 @@ class ProcessScheduler {
                     updateWaitQueueTime(waitQueue2);
 
                     //if ioRequest, add it to the correct waitqueue
+                    //we prioritize processes in the waitQueue process into the readyQueue BEFORE the currentProcess that is running.
                     if (currentProcess.ioRequests.contains(currentProcess.pcb.programCounter)) {
                         printInfo(currentProcess);
                         int device = currentProcess.ioDevices.get(currentProcess.ioRequests.indexOf(currentProcess.pcb.programCounter));
@@ -263,7 +260,7 @@ class ProcessScheduler {
     }
 
 
-    //Print all info
+    //Print all info with a process Running
     public void printInfo(Process currentProcess){
         System.out.println("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Running");
@@ -274,17 +271,15 @@ class ProcessScheduler {
             System.out.println("\t"+process);
         }
         System.out.println("Wait Queue 1");
-        for (int i = 0; i < waitQueue1.size(); i++) {
-            for (Process process : waitQueue1) {
-                System.out.println("\t"+process);
-            }
+        for (Process process : waitQueue1) {
+            System.out.println("\t"+process);
         }
+
         System.out.println("Wait Queue 2");
-        for (int i = 0; i < waitQueue2.size(); i++) {
-            for (Process process : waitQueue2) {
-                System.out.println("\t"+process);
-            }
+        for (Process process : waitQueue2) {
+            System.out.println("\t"+process);
         }
+
         System.out.println("Terminated");
         for (Process process : processes) {
             if (process.pcb.processState.equals(ProcessState.TERMINATED)){
@@ -293,6 +288,8 @@ class ProcessScheduler {
         }
 
     }
+
+    //print info without process running
     public void printInfo(){
         System.out.println("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Running");
@@ -302,17 +299,15 @@ class ProcessScheduler {
             System.out.println("\t"+process);
         }
         System.out.println("Wait Queue 1");
-        for (int i = 0; i < waitQueue1.size(); i++) {
-            for (Process process : waitQueue1) {
-                System.out.println("\t"+process);
-            }
+
+        for (Process process : waitQueue1) {
+            System.out.println("\t"+process);
         }
         System.out.println("Wait Queue 2");
-        for (int i = 0; i < waitQueue2.size(); i++) {
-            for (Process process : waitQueue2) {
-                System.out.println("\t"+process);
-            }
+        for (Process process : waitQueue2) {
+            System.out.println("\t"+process);
         }
+
         System.out.println("Terminated");
         for (Process process : processes) {
             if (process.pcb.processState.equals(ProcessState.TERMINATED)){
@@ -322,8 +317,6 @@ class ProcessScheduler {
     }
 }
 
-
-
 enum ProcessState {
     NEW,
     RUNNING,
@@ -331,15 +324,3 @@ enum ProcessState {
     READY,
     TERMINATED
 }
-
-/*additional notes
-
-While one process is waiting, the 2nd process can execute.
-
-PCB -> class, print the object, every variable gets printed
-which process do we proritize to go back to ready queue
-
-non-preemtive scheduling.
-
-is clock x the IO request.
- */
